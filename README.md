@@ -65,7 +65,11 @@ any machine that doesn't already have Flathub configured as a remote (see NOTES.
   on a bare runner (rather than depending on a specific prebuilt container tag existing, see
   NOTES.md #7) and builds + signs the repository with
   [`andyholmes/flatter`](https://github.com/andyholmes/flatter).
-- **Publish:** uploads the signed repo to GitHub Pages.
+- **Publish:** uploads the signed repo to GitHub Pages, builds a standalone signed
+  `anycubic-slicer-next.flatpak` bundle (same as `build-bundle.sh` produces locally), and
+  creates/updates a [GitHub Release](../../releases) tagged `vX.Y.ZZ` with that bundle
+  attached -- an alternative for people who'd rather download a file than
+  `flatpak remote-add`.
 
 ### One-time setup (already done for this repo, documented for reference / key rotation)
 

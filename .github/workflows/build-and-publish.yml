@@ -47,7 +47,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -79,11 +79,37 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_SIGN_KEY }}
 
       - name: Build and publish repo with flatter
+        id: flatter
         uses: andyholmes/flatter@v1
         with:
           files: io.github.roccorakete.AnycubicSlicerNext.yml
           gpg-sign: ${{ steps.gpg.outputs.fingerprint }}
           upload-pages-artifact: true
+
+      - name: Build distributable bundle
+        # Same artifact build-bundle.sh produces locally -- for the GitHub Release, as an
+        # alternative to `flatpak remote-add` for people who just want a file to double-click.
+        run: |
+          flatpak build-bundle \
+            --gpg-sign=${{ steps.gpg.outputs.fingerprint }} \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            "${{ steps.flatter.outputs.repository }}" \
+            anycubic-slicer-next.flatpak \
+            io.github.roccorakete.AnycubicSlicerNext master
+
+      - name: Determine version
+        id: version
+        run: |
+          version="$(grep -m1 'version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Anycubic Slicer Next ${{ steps.version.outputs.version }}
+          files: anycubic-slicer-next.flatpak
+          make_latest: true
 
   deploy:
     needs: build
