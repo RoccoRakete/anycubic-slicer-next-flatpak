@@ -137,6 +137,24 @@ sandbox with the SDK (not just the runtime) mounted, so `gdb`/`strace` are avail
 the exact environment the app actually runs in. `gdb -batch -ex "break gtk_init_check" -ex run
 -ex finish -ex "print/x \$rax"` was what confirmed the `FALSE` return.
 
+### 6. `flatpak build-bundle` needs `--runtime-repo`, or install fails on a fresh machine
+
+**Found while building a one-off distributable `.flatpak` file (`build-bundle.sh`) to hand to
+someone directly, instead of using `flatpak-builder --install` (which only installs into the
+*local* flatpak-builder-managed install and never hits this).**
+
+`flatpak build-bundle repo out.flatpak <app-id> <branch>` on its own packages only the app
+itself. The bundle carries no record of where its runtime dependencies
+(`org.gnome.Platform//50`, `org.gnome.Sdk//50`) should come from. On a machine that doesn't
+already have Flathub configured as a remote, `flatpak install out.flatpak` then fails outright
+-- it has the app's ostree commit in hand but no source to resolve the missing runtime against.
+
+**Fix:** always pass `--runtime-repo=https://flathub.org/repo/flathub.flatpakrepo`. This embeds
+the Flathub `.flatpakrepo` URL in the bundle's metadata, so `flatpak install` on a fresh machine
+can offer to add the Flathub remote and pull the missing runtime automatically instead of
+failing. `build-bundle.sh` does this already -- if editing that command by hand, don't drop the
+flag.
+
 ## Bugs NOT expected to apply under Flatpak
 
 - The hard-coded `/usr/share/AnycubicSlicerNext/resources` path: the Nix flake worked around

@@ -22,6 +22,26 @@ flatpak-builder --user --install --force-clean build-dir \
 flatpak run --user io.github.roccorakete.AnycubicSlicerNext
 ```
 
+## Building a distributable `.flatpak` bundle
+
+For handing the app to someone directly (no repo hosting, no GitHub Pages/CI) rather than
+installing it into your own local `flatpak-builder` output, use `build-bundle.sh`:
+
+```sh
+./build-bundle.sh
+```
+
+This produces `dist/anycubic-slicer-next.flatpak`, a single file the recipient installs with:
+
+```sh
+flatpak install --user anycubic-slicer-next.flatpak
+```
+
+The script passes `--runtime-repo=https://flathub.org/repo/flathub.flatpakrepo` to
+`flatpak build-bundle` -- **do not drop this flag**. Without it, the bundle has no record of
+where `org.gnome.Platform//50`/`org.gnome.Sdk//50` come from, and `flatpak install` fails on
+any machine that doesn't already have Flathub configured as a remote (see NOTES.md).
+
 ## License
 
 The slicer itself is closed-source software by Anycubic. This project contains none of the
