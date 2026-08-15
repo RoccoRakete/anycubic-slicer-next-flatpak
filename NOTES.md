@@ -200,6 +200,36 @@ api repos/<owner>/<repo>/contents/...`) rather than trusting a README example or
 READMEs lag behind, and prebuilt container availability in particular is easy to get wrong
 without checking the org's own image-build matrix directly.
 
+### 8. Installing from the published repo needs Flathub added too, or "runtime not found"
+
+**Found when the user tried the documented `flatpak remote-add` + `flatpak install` sequence
+on a real second machine and got a runtime-not-found error.**
+
+This repo's GitHub Pages repo hosts only `io.github.roccorakete.AnycubicSlicerNext` itself --
+not `org.gnome.Platform//50`, which the app depends on and which normally comes from Flathub.
+Unlike the `.flatpak` *bundle* route (`build-bundle.sh`, NOTES.md #6), where
+`--runtime-repo=...` embeds a fallback source directly in the bundle's own metadata, a
+repo-based install (`flatpak remote-add` + `flatpak install`) has no equivalent mechanism --
+Flatpak only resolves a missing runtime from remotes *already configured* on the target
+machine (or a matching runtime already installed system- or user-wide). If Flathub isn't
+already added as a remote and the runtime isn't already installed from somewhere, install
+fails outright.
+
+**Fix:** the install instructions now add Flathub as a remote first (see README's "Installing
+from the published repo"), which is standard practice for essentially every third-party
+Flatpak repo built on a shared runtime (GNOME/KDE/Freedesktop) -- none of them re-host the
+base runtime themselves.
+
+**A debugging trap worth flagging for next time:** my first attempt to verify this by
+reproducing the failure locally gave a false negative -- `flatpak install --user` against a
+scratch `$HOME` with *only* this repo's remote added still succeeded, because
+`org.gnome.Platform//50` was already installed **system-wide** on the dev machine from earlier
+testing sessions, and Flatpak's dependency resolution happily used that already-installed
+runtime regardless of which remotes were configured. Only became clear after explicitly
+checking `flatpak list --system --runtime` and finding it there. A `$HOME` override is not a
+clean-room test on a machine that's had flatpak runtimes installed system-wide before; a truly
+isolated container/VM is needed to actually reproduce a "nothing pre-installed" scenario.
+
 ## Bugs NOT expected to apply under Flatpak
 
 - The hard-coded `/usr/share/AnycubicSlicerNext/resources` path: the Nix flake worked around

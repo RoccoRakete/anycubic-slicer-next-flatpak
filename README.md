@@ -14,7 +14,12 @@ and [NOTES.md](NOTES.md) for known upstream bugs and how they're worked around.
 
 ## Installing from the published repo
 
+This repo only hosts the app itself, not the `org.gnome.Platform//50` runtime it depends on --
+that comes from Flathub, so Flathub has to be added as a remote too (most desktops already
+have it; the command below is a no-op if so):
+
 ```sh
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak remote-add --user --if-not-exists anycubic-slicer-next-flatpak \
   https://roccorakete.github.io/anycubic-slicer-next-flatpak/index.flatpakrepo
 flatpak install --user anycubic-slicer-next-flatpak io.github.roccorakete.AnycubicSlicerNext
