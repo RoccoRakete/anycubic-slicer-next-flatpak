@@ -15,72 +15,82 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch: {}
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  # Only runs on the weekly schedule: bumps the manifest's url/sha256 pin (and the
+  # appdata.xml release entry) if Anycubic has shipped a newer .deb, tags the commit, and
+  # pushes -- which in turn triggers the `build` job via the `push` trigger above.
   check-update:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.update.outputs.changed }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - id: update
-        run: |
+      - run: |
           ./update-anycubic-slicer.sh
           if git diff --quiet -- io.github.roccorakete.AnycubicSlicerNext.yml; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git commit -am "Update Anycubic Slicer Next .deb pin"
-            git push
+            echo "no update available"
+            exit 0
           fi
+          version="$(grep -m1 'version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "Update Anycubic Slicer Next to $version"
+          git tag "v$version"
+          git push --follow-tags
 
   build:
-    needs: [check-update]
-    if: always() && (github.event_name != 'schedule' || needs.check-update.outputs.changed == 'true')
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
-      options: --privileged
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Free up disk space
         run: |
-          rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
           df -h
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: anycubic-slicer-next.flatpak
-          manifest-path: io.github.roccorakete.AnycubicSlicerNext.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-          build-bundle: false
-          repository-name: flathub
-          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+      - name: Allow unprivileged user namespaces
+        # bubblewrap (used by flatpak-builder) needs this on Ubuntu 24.04+ runners, where
+        # AppArmor restricts unprivileged user namespace creation by default. Non-fatal if
+        # the sysctl key doesn't exist on whatever runner image is current.
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
-      - name: Build and sign repo with flatter
-        uses: andyholmes/flatter@main
+      - name: Install flatpak, flatpak-builder, and the GNOME 50 SDK
+        # No prebuilt container has a GNOME 50 image yet (flathub-infra tops out at 48,
+        # andyholmes/flatter at 49/master) -- installing fresh here avoids depending on one
+        # existing and matches exactly what's verified working in local testing.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install --noninteractive flathub org.gnome.Platform//50 org.gnome.Sdk//50
+
+      - name: Import GPG signing key
+        id: gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_SIGN_KEY }}
+
+      - name: Build and publish repo with flatter
+        uses: andyholmes/flatter@v1
         with:
           files: io.github.roccorakete.AnycubicSlicerNext.yml
-          gpg-sign: ${{ secrets.GPG_SIGN_KEY }}
+          gpg-sign: ${{ steps.gpg.outputs.fingerprint }}
           upload-pages-artifact: true
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

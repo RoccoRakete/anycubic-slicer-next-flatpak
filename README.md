@@ -8,10 +8,23 @@ repackages it as a Flatpak.
 Sibling project: [`anycubic-slicer-next-flake`](https://github.com/RoccoRakete/anycubic-slicer-next-flake),
 a Nix flake doing the same job for NixOS specifically.
 
-**Status:** builds and runs locally via `flatpak-builder`. See [PLAN.md](PLAN.md) for the
-architecture and [NOTES.md](NOTES.md) for known upstream bugs and how they're worked around.
-The GitHub Actions publish workflow hasn't been exercised in CI yet (needs a GPG signing key
-secret configured on the repo first).
+**Status:** builds and runs locally via `flatpak-builder`, and publishes to a hosted, updatable
+Flatpak repository via GitHub Actions (see below). See [PLAN.md](PLAN.md) for the architecture
+and [NOTES.md](NOTES.md) for known upstream bugs and how they're worked around.
+
+## Installing from the published repo
+
+Once [`build-and-publish.yml`](.github/workflows/build-and-publish.yml) has run at least once
+on `main`:
+
+```sh
+flatpak remote-add --user --if-not-exists anycubic-slicer-next-flatpak \
+  https://roccorakete.github.io/anycubic-slicer-next-flatpak/index.flatpakrepo
+flatpak install --user anycubic-slicer-next-flatpak io.github.roccorakete.AnycubicSlicerNext
+```
+
+Updates land via the normal `flatpak update` -- no manual re-download needed, unlike the
+`.flatpak` bundle route below.
 
 ## Building and running locally
 
@@ -41,6 +54,32 @@ The script passes `--runtime-repo=https://flathub.org/repo/flathub.flatpakrepo` 
 `flatpak build-bundle` -- **do not drop this flag**. Without it, the bundle has no record of
 where `org.gnome.Platform//50`/`org.gnome.Sdk//50` come from, and `flatpak install` fails on
 any machine that doesn't already have Flathub configured as a remote (see NOTES.md).
+
+## CI: build, version, and publish
+
+[`build-and-publish.yml`](.github/workflows/build-and-publish.yml) does three things:
+
+- **Version:** on a weekly schedule, `update-anycubic-slicer.sh` checks Anycubic's own apt
+  repo for a newer `.deb`. If found, it bumps the manifest's `url`/`sha256` pin, prepends an
+  `<release>` entry to the AppStream metadata (version + the `.deb`'s own build date, not
+  "today"), commits, tags the commit `vX.Y.ZZ`, and pushes -- which triggers the next step.
+- **Build:** on every push to `main` that touches the manifest/patch/wrapper/desktop files (or
+  via manual `workflow_dispatch`), builds the app with `flatpak-builder` (installed fresh each
+  run -- no prebuilt container ships a GNOME 50 SDK image yet, see NOTES.md) and signs the
+  repository with [`andyholmes/flatter`](https://github.com/andyholmes/flatter).
+- **Publish:** uploads the signed repo to GitHub Pages.
+
+### One-time setup (already done for this repo, documented for reference / key rotation)
+
+1. Generate a signing key: `gpg --batch --passphrase '' --quick-gen-key "<uid>" default default never`
+2. Add the exported private key as the `GPG_SIGN_KEY` repo secret:
+   `gpg --armor --export-secret-key <fingerprint> | gh secret set GPG_SIGN_KEY`
+3. Publish the public key in the repo for manual verification (`signing-key.gpg.asc`):
+   `gpg --armor --export <fingerprint> > signing-key.gpg.asc`
+4. Enable GitHub Pages with "GitHub Actions" as the source:
+   `gh api repos/<owner>/<repo>/pages -X POST -f build_type=workflow`
+5. Delete the private key material from local disk once the secret is uploaded -- only the
+   `GPG_SIGN_KEY` secret and this repo's `signing-key.gpg.asc` need to persist.
 
 ## License
 

@@ -155,6 +155,42 @@ can offer to add the Flathub remote and pull the missing runtime automatically i
 failing. `build-bundle.sh` does this already -- if editing that command by hand, don't drop the
 flag.
 
+### 7. CI: no prebuilt GNOME 50 build container exists yet, and `flatter`'s `gpg-sign` wants a fingerprint, not a key
+
+**Found setting up `build-and-publish.yml` for real -- the original version of this workflow,
+written before ever running it, had both of these wrong and would have failed immediately.**
+
+- The original workflow ran inside `ghcr.io/flathub-infra/flatpak-github-actions:gnome-50`.
+  That tag doesn't exist -- checked `flathub-infra/flatpak-github-actions`'s own
+  `.github/workflows/docker.yml` build matrix directly, and it only publishes up to
+  `gnome-48`. `andyholmes/flatter`'s own prebuilt images (`ghcr.io/andyholmes/flatter/gnome`)
+  only go up to `49` plus a `master` (nightly) tag -- also no `50`. Since our manifest pins
+  `runtime-version: "50"` (deliberately, to match what was verified working locally), neither
+  prebuilt container works. **Fix:** don't use a prebuilt container at all -- install
+  `flatpak`/`flatpak-builder` via `apt` and `flatpak install` the GNOME 50 Platform/Sdk fresh
+  in the job, same as tested locally. This also sidesteps needing to track whichever project
+  gets around to publishing a `:50` image first.
+- Bare `ubuntu-latest` runners (Ubuntu 24.04+) restrict unprivileged user namespace creation
+  via AppArmor by default, which breaks bubblewrap (what `flatpak-builder` uses for sandboxed
+  builds) outside of a `--privileged` container. Fix: `sudo sysctl -w
+  kernel.apparmor_restrict_unprivileged_userns=0` as a step before installing flatpak-builder.
+- `andyholmes/flatter`'s `gpg-sign` input is documented as "The fingerprint of a GPG key to
+  sign the repository with" -- **not** the key material itself. The original workflow passed
+  `${{ secrets.GPG_SIGN_KEY }}` (the private key) directly into `gpg-sign`, which would have
+  failed. The key has to be imported into the runner's GPG keyring first (via
+  `crazy-max/ghaction-import-gpg@v7`, which outputs a `fingerprint`), and *that* fingerprint
+  output gets passed to `gpg-sign`.
+- Running `flatpak/flatpak-github-actions/flatpak-builder` and `andyholmes/flatter` in the same
+  job (as the original workflow did) builds the app twice -- `flatter` already builds from the
+  manifest internally as part of producing the signed repo. Dropped the separate
+  `flatpak-builder` step entirely.
+
+Also worth remembering for next time a CI action is added blind (not yet run for real): check
+the action's actual `action.yml` inputs and the *publisher's own* CI/build workflow (via `gh
+api repos/<owner>/<repo>/contents/...`) rather than trusting a README example or memory --
+READMEs lag behind, and prebuilt container availability in particular is easy to get wrong
+without checking the org's own image-build matrix directly.
+
 ## Bugs NOT expected to apply under Flatpak
 
 - The hard-coded `/usr/share/AnycubicSlicerNext/resources` path: the Nix flake worked around

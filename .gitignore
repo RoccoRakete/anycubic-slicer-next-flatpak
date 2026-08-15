@@ -2,3 +2,5 @@
 build-dir/
 *.flatpak
 repo/
+dist/
+result.json
