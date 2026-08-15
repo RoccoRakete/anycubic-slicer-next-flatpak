@@ -36,7 +36,7 @@ jobs:
             echo "no update available"
             exit 0
           fi
-          version="$(grep -m1 'version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
+          version="$(grep -m1 '<release version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "Update Anycubic Slicer Next to $version"
@@ -100,7 +100,7 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          version="$(grep -m1 'version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
+          version="$(grep -m1 '<release version="' io.github.roccorakete.AnycubicSlicerNext.appdata.xml | sed -E 's/.*version="([^"]+)".*/\1/')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
