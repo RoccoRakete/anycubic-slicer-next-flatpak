@@ -5,7 +5,7 @@ distro-independent (works on any Linux with Flatpak support). Anycubic only ship
 a proprietary `.deb` for Ubuntu 24.04; this project downloads the official package and
 repackages it as a Flatpak.
 
-Sibling project: [`anycubic-slicer-next`](https://github.com/roccorakete/anycubic-slicer-next),
+Sibling project: [`anycubic-slicer-next-flake`](https://github.com/RoccoRakete/anycubic-slicer-next-flake),
 a Nix flake doing the same job for NixOS specifically.
 
 **Status:** builds and runs locally via `flatpak-builder`. See [PLAN.md](PLAN.md) for the
