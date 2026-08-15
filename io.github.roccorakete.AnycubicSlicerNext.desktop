@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Anycubic Slicer Next
+GenericName=3D Printing Software
+Comment=Slice 3D models for Anycubic printers
+Icon=io.github.roccorakete.AnycubicSlicerNext
+Exec=anycubic-slicer-next %U
+Terminal=false
+Type=Application
+MimeType=model/stl;model/3mf;application/vnd.ms-3mfdocument;application/prs.wavefront-obj;application/x-amf;x-scheme-handler/acnext;
+Categories=Graphics;3DGraphics;Engineering;
+Keywords=3D;Printing;Slicer;slice;printer;convert;gcode;stl;obj;amf;SLA;
+StartupNotify=false
+StartupWMClass=AnycubicSlicerNext

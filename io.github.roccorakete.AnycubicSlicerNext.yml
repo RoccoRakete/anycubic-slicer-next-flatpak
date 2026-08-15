@@ -1,0 +1,77 @@
+app-id: io.github.roccorakete.AnycubicSlicerNext
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: anycubic-slicer-next
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=x11
+  - --socket=pulseaudio
+  - --device=all
+  - --filesystem=home
+  - --filesystem=/run/media
+  - --filesystem=/media
+  - --filesystem=xdg-run/gvfs
+
+add-extensions:
+  org.freedesktop.Platform.ffmpeg-full:
+    directory: lib/ffmpeg
+    add-ld-path: .
+    version: "24.08"
+    autodownload: true
+
+modules:
+  - name: anycubic-slicer-next
+    buildsystem: simple
+    sources:
+      - type: file
+        url: https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64/develop_AnycubicSlicerNext-1.3.96_20260319_224609-Ubuntu_24_04_3_LTS.deb
+        sha256: 2c2883a9c624ab64e721a0211667852e0083d8794f7839c1d7932c9f712ed076
+        dest-filename: anycubic-slicer-next.deb
+      - type: file
+        path: patches/patch-resource-path.py
+      - type: file
+        path: anycubic-slicer-next
+      - type: file
+        path: io.github.roccorakete.AnycubicSlicerNext.desktop
+      - type: file
+        path: io.github.roccorakete.AnycubicSlicerNext.appdata.xml
+    build-commands:
+      # Unpack the .deb payload -- same ar/tar approach as the sibling Nix flake's
+      # unpackPhase, no dpkg needed.
+      - ar x anycubic-slicer-next.deb
+      - tar xf data.tar.*
+
+      # Flatpak's /usr is the read-only runtime; this app's own resources have to live
+      # under /app instead. Equal-length string patch (both are 4 chars), see the patch
+      # script for details.
+      - python3 patch-resource-path.py usr/bin/AnycubicSlicerNext
+
+      - install -Dm755 usr/bin/AnycubicSlicerNext /app/bin/AnycubicSlicerNext
+      - install -Dm755 anycubic-slicer-next /app/bin/anycubic-slicer-next
+      - mkdir -p /app/lib /app/share
+      - find usr/lib -maxdepth 1 -name '*.so' -exec cp -P {} /app/lib/ \;
+      - cp -r usr/share/AnycubicSlicerNext /app/share/AnycubicSlicerNext
+
+      # libWorkbench.so's registerHandler() is a no-op stub (vendor bug, see NOTES.md);
+      # extract the Vue SPA embedded in its .rodata as a ZIP so the wrapper script's
+      # ACNEXT_WORKBENCH_ENV_VAR override can point straight at it.
+      - |
+        set -e
+        offset=$(grep -abo $'PK\x03\x04' usr/lib/libWorkbench.so | head -1 | cut -d: -f1)
+        mkdir -p /app/share/AnycubicSlicerNext/resources/workbench
+        tail -c +$((offset + 1)) usr/lib/libWorkbench.so > workbench.zip
+        unzip -q workbench.zip -d /app/share/AnycubicSlicerNext/resources/workbench
+        rm workbench.zip
+
+      - install -Dm644 io.github.roccorakete.AnycubicSlicerNext.desktop
+        /app/share/applications/io.github.roccorakete.AnycubicSlicerNext.desktop
+      - install -Dm644 io.github.roccorakete.AnycubicSlicerNext.appdata.xml
+        /app/share/metainfo/io.github.roccorakete.AnycubicSlicerNext.appdata.xml
+      - install -Dm644 usr/share/AnycubicSlicerNext/resources/images/AnycubicSlicer.svg
+        /app/share/icons/hicolor/scalable/apps/io.github.roccorakete.AnycubicSlicerNext.svg
+      - install -Dm644 usr/share/AnycubicSlicerNext/resources/images/AnycubicSlicer.png
+        /app/share/icons/hicolor/512x512/apps/io.github.roccorakete.AnycubicSlicerNext.png

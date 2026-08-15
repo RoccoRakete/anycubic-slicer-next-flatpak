@@ -1,0 +1,18 @@
+#!/bin/sh
+# The vendor GTK3 build only ever attempts the X11 backend (confirmed via GDK_DEBUG=misc:
+# it logs "Trying x11 backend" and nothing else, regardless of GDK_BACKEND), so on a
+# Wayland session it needs X11 (via Xwayland) unconditionally. Flatpak's
+# --socket=fallback-x11 only grants X11 when *no* Wayland socket is present, which isn't
+# our case, so the manifest requests plain --socket=x11 instead; this just makes the
+# selection explicit rather than relying on GTK's (single-option) auto-detection.
+export GDK_BACKEND=x11
+
+# libWorkbench.so's registerHandler() is a no-op stub in this vendor build, so the
+# "pages://" URI scheme it's meant to serve never responds and the Workbench tab (device/
+# cloud printer management) stays blank. The Workbench SPA is extracted from libWorkbench.so
+# at build time into resources/workbench/; this undocumented debug override env var
+# (found via `strings` on the main binary) points the app straight at it, bypassing the
+# broken handler entirely. See NOTES.md for the full investigation.
+export ACNEXT_WORKBENCH_ENV_VAR="file:///app/share/AnycubicSlicerNext/resources/workbench/index.html"
+
+exec /app/bin/AnycubicSlicerNext "$@"

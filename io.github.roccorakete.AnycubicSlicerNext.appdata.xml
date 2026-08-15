@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.roccorakete.AnycubicSlicerNext</id>
+  <name>Anycubic Slicer Next</name>
+  <summary>Slice 3D models for Anycubic printers</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>
+      Anycubic Slicer Next is Anycubic's official slicing software for their
+      FDM and resin 3D printers, based on OrcaSlicer/Bambu Studio. This is an
+      unofficial Flatpak repackaging of the vendor's proprietary Debian
+      package; it contains none of the slicer's code and downloads the
+      official binary from Anycubic's own CDN at build time.
+    </p>
+    <p>
+      This packaging is not affiliated with or endorsed by Anycubic.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.roccorakete.AnycubicSlicerNext.desktop</launchable>
+  <url type="homepage">https://github.com/roccorakete/anycubic-slicer-next-flatpak</url>
+  <url type="bugtracker">https://github.com/roccorakete/anycubic-slicer-next-flatpak/issues</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.3.96" date="2026-03-19"/>
+  </releases>
+  <categories>
+    <category>Graphics</category>
+    <category>3DGraphics</category>
+    <category>Engineering</category>
+  </categories>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>

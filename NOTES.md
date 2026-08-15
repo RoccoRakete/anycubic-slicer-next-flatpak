@@ -97,6 +97,46 @@ Very likely shipping *broken for everyone* right now, not just under sandboxed p
 APT repo for months. Worth re-checking whether a future upstream version fixes this properly
 (making the workaround unnecessary) before spending more effort on it.
 
+### 5. GTK3 backend selection: the app only ever tries X11, never Wayland
+
+**Found while first getting the Flatpak build to actually launch, not predicted by the plan.**
+
+The packaged binary starts, does its single-instance file-lock check, spawns the Pango/
+fontconfig thread, then calls `gtk_init_check()` -- which returned `FALSE` every time under
+Flatpak on a Wayland session, confirmed with a debugger breakpoint (`$rax == 0` right after
+the call). The app's own error-handling path then tries to disconnect a signal handler from
+an object that was never constructed because init failed, producing a
+`GLib-GObject-CRITICAL: invalid (NULL) pointer instance` / `g_signal_handlers_disconnect_matched`
+assertion pair, immediately followed by `exit(-1)`. No window, no crash dump, no useful
+message -- just a silent-ish bail. This is *not* a WebKitGTK bug (bug #3 above); it happens
+before any WebKit/display-connection code runs at all, confirmed via strace showing zero
+`socket()`/`connect()` calls before the exit.
+
+Root cause, found with `GDK_DEBUG=misc`: GDK logs `Trying x11 backend` and nothing else --
+this vendor GTK3 build never attempts the Wayland backend, regardless of `GDK_BACKEND`. (The
+sibling Nix flake independently arrived at the same conclusion -- its `profile` script forces
+`GDK_BACKEND=x11` -- but didn't record *why* it was necessary, just that testing showed it was
+needed. This session's debugging fills in the actual mechanism.)
+
+That alone would be harmless (X11-via-Xwayland normally works fine as a fallback on a Wayland
+session) except: Flatpak's `--socket=fallback-x11` finish-arg **only grants X11 socket access
+when no Wayland socket is available**. On a Wayland session (which is the common case), the
+X11 socket is intentionally *not* bind-mounted in, `DISPLAY` stays unset inside the sandbox
+(confirmed: empty `/tmp/.X11-unix` and empty `$DISPLAY` inside the sandbox despite the host
+having a live Xwayland socket at `/tmp/.X11-unix/X0`), and GTK's only backend has nothing to
+connect to.
+
+**Fix:** use the unconditional `--socket=x11` finish-arg instead of `--socket=fallback-x11`,
+and set `GDK_BACKEND=x11` explicitly in the wrapper script (belt-and-suspenders --
+`--socket=x11` alone was sufficient in testing since the app doesn't try Wayland anyway, but
+forcing it matches the Nix flake's proven-working config and documents the intent).
+
+Debugging technique used to nail this down, worth keeping in mind for future issues with this
+binary: `flatpak run --user --devel --command=sh <app-id> -c '...'` drops into the app's own
+sandbox with the SDK (not just the runtime) mounted, so `gdb`/`strace` are available inside
+the exact environment the app actually runs in. `gdb -batch -ex "break gtk_init_check" -ex run
+-ex finish -ex "print/x \$rax"` was what confirmed the `FALSE` return.
+
 ## Bugs NOT expected to apply under Flatpak
 
 - The hard-coded `/usr/share/AnycubicSlicerNext/resources` path: the Nix flake worked around
