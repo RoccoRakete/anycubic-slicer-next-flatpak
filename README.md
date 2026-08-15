@@ -14,9 +14,6 @@ and [NOTES.md](NOTES.md) for known upstream bugs and how they're worked around.
 
 ## Installing from the published repo
 
-Once [`build-and-publish.yml`](.github/workflows/build-and-publish.yml) has run at least once
-on `main`:
-
 ```sh
 flatpak remote-add --user --if-not-exists anycubic-slicer-next-flatpak \
   https://roccorakete.github.io/anycubic-slicer-next-flatpak/index.flatpakrepo
@@ -64,9 +61,10 @@ any machine that doesn't already have Flathub configured as a remote (see NOTES.
   `<release>` entry to the AppStream metadata (version + the `.deb`'s own build date, not
   "today"), commits, tags the commit `vX.Y.ZZ`, and pushes -- which triggers the next step.
 - **Build:** on every push to `main` that touches the manifest/patch/wrapper/desktop files (or
-  via manual `workflow_dispatch`), builds the app with `flatpak-builder` (installed fresh each
-  run -- no prebuilt container ships a GNOME 50 SDK image yet, see NOTES.md) and signs the
-  repository with [`andyholmes/flatter`](https://github.com/andyholmes/flatter).
+  via manual `workflow_dispatch`), installs `flatpak`/`flatpak-builder`/the GNOME 50 SDK fresh
+  on a bare runner (rather than depending on a specific prebuilt container tag existing, see
+  NOTES.md #7) and builds + signs the repository with
+  [`andyholmes/flatter`](https://github.com/andyholmes/flatter).
 - **Publish:** uploads the signed repo to GitHub Pages.
 
 ### One-time setup (already done for this repo, documented for reference / key rotation)
