@@ -4,11 +4,14 @@
 # flake's update script, just targeting the flatpak-builder manifest instead of a Nix
 # fetcher call.
 set -euo pipefail
+# Without this, a failing command substitution exits silently -- which in CI shows up as a
+# bare "exit code 1" with no hint of which line failed.
+trap 'echo "error: ${BASH_SOURCE[0]}:$LINENO: \`$BASH_COMMAND\` failed" >&2' ERR
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 manifest="$repo_root/io.github.roccorakete.AnycubicSlicerNext.yml"
 appdata="$repo_root/io.github.roccorakete.AnycubicSlicerNext.appdata.xml"
-packages_url="https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64/Packages"
+packages_url="${PACKAGES_URL:-https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64/Packages}"
 cdn_base="https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64"
 
 packages="$(curl -fsSL "$packages_url")"
@@ -25,11 +28,14 @@ fi
 deb_basename="$(basename "$filename")"
 new_url="$cdn_base/$deb_basename"
 
-# The .deb filename embeds a build timestamp, e.g.
-# develop_AnycubicSlicerNext-1.3.96_20260319_224609-Ubuntu_24_04_3_LTS.deb -- use its date
-# as the AppStream release date rather than "today" (today is when CI happened to run,
-# not when the vendor actually shipped this build).
-release_date="$(printf '%s\n' "$deb_basename" | grep -oE '_[0-9]{8}_' | head -1 | tr -d '_')"
+# The .deb filename embeds a build timestamp -- use its date as the AppStream release date
+# rather than "today" (today is when CI happened to run, not when the vendor actually
+# shipped this build). Anycubic has used two schemes so far:
+#   develop_AnycubicSlicerNext-1.3.96_20260319_224609-Ubuntu_24_04_3_LTS.deb  (1.3.x)
+#   AnycubicSlicerNext_linux-v2.0.0.5-20260913065625.deb                      (2.0.x)
+# `|| true`: under pipefail a no-match grep would otherwise abort the script here instead
+# of reaching the "today" fallback below.
+release_date="$(printf '%s\n' "$deb_basename" | grep -oE '[_-]20[0-9]{6}' | head -1 | tr -d '_-' || true)"
 if [[ -n "$release_date" ]]; then
   release_date="${release_date:0:4}-${release_date:4:2}-${release_date:6:2}"
 else

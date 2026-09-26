@@ -65,6 +65,8 @@ any machine that doesn't already have Flathub configured as a remote (see NOTES.
   repo for a newer `.deb`. If found, it bumps the manifest's `url`/`sha256` pin, prepends an
   `<release>` entry to the AppStream metadata (version + the `.deb`'s own build date, not
   "today"), commits, tags the commit `vX.Y.ZZ`, and pushes -- which triggers the next step.
+  `tests/update-script.sh` runs first: an offline regression test of the update script
+  against fixture `Packages` indexes (needs `python3`; see NOTES.md #9).
 - **Build:** on every push to `main` that touches the manifest/patch/wrapper/desktop files (or
   via manual `workflow_dispatch`), installs `flatpak`/`flatpak-builder`/the GNOME 50 SDK fresh
   on a bare runner (rather than depending on a specific prebuilt container tag existing, see

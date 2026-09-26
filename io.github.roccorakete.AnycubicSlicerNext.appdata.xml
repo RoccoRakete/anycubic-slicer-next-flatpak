@@ -22,6 +22,7 @@
   <url type="bugtracker">https://github.com/roccorakete/anycubic-slicer-next-flatpak/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="2.0.06" date="2026-09-13"/>
     <release version="1.3.96" date="2026-03-19"/>
   </releases>
   <categories>

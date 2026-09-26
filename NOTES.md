@@ -230,6 +230,65 @@ checking `flatpak list --system --runtime` and finding it there. A `$HOME` overr
 clean-room test on a machine that's had flatpak runtimes installed system-wide before; a truly
 isolated container/VM is needed to actually reproduce a "nothing pre-installed" scenario.
 
+### 9. CI: weekly update check dies silently when Anycubic changes the `.deb` naming scheme
+
+**Found when the scheduled `check-update` job started failing (2026-09-21) with a bare
+"Process completed with exit code 1" and no other output.**
+
+Anycubic shipped 2.0.06 under a new filename scheme:
+
+    develop_AnycubicSlicerNext-1.3.96_20260319_224609-Ubuntu_24_04_3_LTS.deb   (1.3.x)
+    AnycubicSlicerNext_linux-v2.0.0.5-20260913065625.deb                       (2.0.x)
+
+`update-anycubic-slicer.sh` extracted the release date with `grep -oE '_[0-9]{8}_' | head -1`.
+On the new name that matches nothing, grep exits 1, `pipefail` turns the command substitution
+into a failure, and `set -e` kills the script -- before the "fall back to today" branch that
+was written for exactly this case could run. Nothing on stderr, so the CI log gave no hint.
+
+**Fix:** the regex now accepts both schemes (`[_-]20[0-9]{6}`), the pipeline ends in
+`|| true` so an unknown scheme really does fall back to today, and an `ERR` trap prints the
+failing line + command so the next silent `set -e` exit isn't silent.
+`tests/update-script.sh` runs the script offline against fixture `Packages` indexes (via the
+`PACKAGES_URL` override, `file://` works) for both known schemes plus an unknown one; CI runs
+it before the real update check.
+
+With the script fixed, the 2.0 bump itself then broke the build -- see #10.
+
+### 10. 2.0.x: resource path no longer a single string, `patch-resource-path.py` found nothing
+
+**Found while making sure the fix for #9 wouldn't just hand the next CI run a broken build.**
+
+1.3.x had one literal `/usr/share/AnycubicSlicerNext` in the binary. 2.0.x doesn't; the patch
+script errored out (`not found`), failing the build. Tracing references to the string with
+`objdump -d` (look for `lea rsi,[rip+...] # <string vaddr>`; `.rodata`'s file offset equals
+its vaddr in this binary) showed the resources dir is now built as
+`std::string("/usr/share/") + <app name> + "/resources"` -- only a bare, NUL-terminated
+`"/usr/share/"` literal exists, exactly once.
+
+That single literal has **two** users: the resources-dir code above, and wxWidgets' MIME-type
+lookup (`wxMimeTypesManagerImpl`, next to `mime/globs` / `/opt/gnome/share` strings) -- the
+linker merged the identical literals. Patching it to `/app/share/` therefore also moves wx's
+KDE/GNOME MIME-file search into `/app/share/`. Accepted as harmless: that search only affects
+wx's own file-type associations, GTK/GIO keep using the runtime's `XDG_DATA_DIRS`, and loading
+3MF/STL is by the app's own parsers, not MIME lookup.
+
+**Fix:** `patch-resource-path.py` tries the 1.3.x literal first, then `\0/usr/share/\0`, and
+insists on exactly one occurrence of the latter so a future layout change fails the build
+loudly instead of patching something unrelated.
+
+**Verified (2026-09-26):** local build of 2.0.06 succeeds; `flatpak run` starts and stays up,
+copies the system profiles from `/app/share/AnycubicSlicerNext/resources/profiles`, loads
+fonts from `resources/fonts`, and creates the Workbench panel. The ~135
+`contains incorrect keys: filament_prime_volume` errors in the app log are the vendor's own
+profile JSON, unrelated to packaging.
+
+**A debugging trap worth flagging:** `flatpak-builder --run build-dir <manifest> ...` is *not*
+equivalent to `flatpak run` for this app -- it aborted within seconds in GTK's icon loading
+(`glycin-svg` via `flatpak-spawn --sandbox` "exited early", then a `Gtk:ERROR` on
+`image-missing.svg`), which looks exactly like a resources-path failure but isn't. The same
+build installed with `--user --install` and started via `flatpak run` runs fine. Test with a
+real install.
+
 ## Bugs NOT expected to apply under Flatpak
 
 - The hard-coded `/usr/share/AnycubicSlicerNext/resources` path: the Nix flake worked around

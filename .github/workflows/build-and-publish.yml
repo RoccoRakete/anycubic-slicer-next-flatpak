@@ -30,6 +30,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - run: tests/update-script.sh
       - run: |
           ./update-anycubic-slicer.sh
           if git diff --quiet -- io.github.roccorakete.AnycubicSlicerNext.yml; then

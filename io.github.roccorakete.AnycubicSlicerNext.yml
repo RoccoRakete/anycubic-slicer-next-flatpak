@@ -28,8 +28,8 @@ modules:
     buildsystem: simple
     sources:
       - type: file
-        url: https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64/develop_AnycubicSlicerNext-1.3.96_20260319_224609-Ubuntu_24_04_3_LTS.deb
-        sha256: 2c2883a9c624ab64e721a0211667852e0083d8794f7839c1d7932c9f712ed076
+        url: https://cdn-universe-slicer.anycubic.com/prod/dists/noble/main/binary-amd64/AnycubicSlicerNext_linux-v2.0.0.5-20260913065625.deb
+        sha256: fe087a56014ed25cdfe4c3c293b517adaee0a9b2e1ded79f5e394b7968817c15
         dest-filename: anycubic-slicer-next.deb
       - type: file
         path: patches/patch-resource-path.py
