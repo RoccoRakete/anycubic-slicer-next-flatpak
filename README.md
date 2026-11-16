@@ -1,3 +1,5 @@
+> This repository has moved to https://git.mscloud.uk/martin/anycubic-slicer-next-flatpak and is archived. Development and CI happen there.
+
 # anycubic-slicer-next-flatpak
 
 Unofficial Flatpak packaging for [Anycubic Slicer Next](https://github.com/ANYCUBIC-3D/AnycubicSlicer),
